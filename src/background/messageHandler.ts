@@ -9,6 +9,8 @@ import {
 } from '../shared/types/messages';
 import { storageService } from './storageService';
 import { Settings } from '../shared/types/settings';
+import { llmService } from './llmService';
+import { startKeepAlive, stopKeepAlive } from './index';
 
 type MessageSender = chrome.runtime.MessageSender;
 type SendResponse = (response?: any) => void;
@@ -88,18 +90,83 @@ export class MessageHandler {
   }
 
   /**
-   * Handle chat messages (will be implemented with LLM integration)
+   * Handle chat messages with streaming
    */
   private async handleChatMessage(
     message: any,
     sendResponse: SendResponse
   ): Promise<void> {
-    console.log('TODO: Handle chat message', message);
-    // This will be implemented in Step 5 (LLM Integration)
-    sendResponse({
-      success: true,
-      message: 'Chat functionality will be implemented in Step 5'
-    });
+    const { messages } = message.data;
+
+    try {
+      // Get settings
+      const settings = await storageService.getSettings();
+
+      // Validate settings
+      const validation = storageService.validateSettings(settings);
+      if (!validation.valid) {
+        sendResponse({
+          success: false,
+          error: validation.errors.join(', ')
+        });
+        return;
+      }
+
+      // Start keep-alive to prevent service worker from terminating
+      startKeepAlive();
+
+      // Send initial response to acknowledge request
+      sendResponse({
+        success: true,
+        streaming: true,
+        message: 'Starting chat stream'
+      });
+
+      // Stream response chunks back to side panel
+      const messageId = `msg_${Date.now()}`;
+
+      try {
+        for await (const chunk of llmService.chat(settings, messages)) {
+          // Send each chunk to side panel
+          chrome.runtime.sendMessage({
+            type: MessageType.STREAM_CHUNK,
+            data: {
+              chunk,
+              messageId
+            },
+            timestamp: Date.now()
+          });
+        }
+
+        // Send completion message
+        chrome.runtime.sendMessage({
+          type: MessageType.STREAM_COMPLETE,
+          data: { messageId },
+          timestamp: Date.now()
+        });
+      } catch (streamError: any) {
+        // Send error to side panel
+        chrome.runtime.sendMessage({
+          type: MessageType.ERROR,
+          data: {
+            type: 'STREAM_ERROR',
+            message: streamError.message || 'Streaming failed',
+            timestamp: Date.now()
+          },
+          timestamp: Date.now()
+        });
+      } finally {
+        // Stop keep-alive
+        stopKeepAlive();
+      }
+    } catch (error: any) {
+      console.error('Error handling chat message:', error);
+      sendResponse({
+        success: false,
+        error: error.message || 'Failed to process chat message'
+      });
+      stopKeepAlive();
+    }
   }
 
   /**

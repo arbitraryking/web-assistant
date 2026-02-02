@@ -1,8 +1,17 @@
 // Background service worker for LLM Chrome Extension
 import { messageHandler } from './messageHandler';
 import { BaseMessage } from '../shared/types/messages';
+import { llmService } from './llmService';
+import { openaiProvider } from './openaiProvider';
+import { anthropicProvider } from './anthropicProvider';
+import { customProvider } from './customProvider';
 
 console.log('LLM Assistant: Background service worker loaded');
+
+// Register LLM providers
+llmService.registerProvider(openaiProvider);
+llmService.registerProvider(anthropicProvider);
+llmService.registerProvider(customProvider);
 
 // Set up side panel on extension install
 chrome.runtime.onInstalled.addListener(() => {
