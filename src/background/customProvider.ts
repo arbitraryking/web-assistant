@@ -1,7 +1,6 @@
 // Custom Provider Implementation (OpenAI-compatible APIs)
 import { LLMProvider, ChatParams } from './llmService';
 import { Settings } from '../shared/types/settings';
-import OpenAI from 'openai';
 
 export class CustomProvider implements LLMProvider {
   name = 'custom';
@@ -36,7 +35,7 @@ export class CustomProvider implements LLMProvider {
   }
 
   /**
-   * Send chat request to custom OpenAI-compatible API with streaming
+   * Send chat request to custom OpenAI-compatible API with streaming using fetch
    */
   async *chat(params: ChatParams): AsyncGenerator<string, void, unknown> {
     const config = await this.getConfig();
@@ -45,51 +44,88 @@ export class CustomProvider implements LLMProvider {
       throw new Error('Custom provider configuration not found');
     }
 
-    // Use OpenAI SDK with custom base URL
-    const client = new OpenAI({
-      apiKey: config.apiKey,
-      baseURL: config.baseUrl,
-      dangerouslyAllowBrowser: true // Running in service worker
-    });
-
     // Convert ChatMessage[] to OpenAI message format
     const messages = params.messages.map((msg) => ({
-      role: msg.role as 'user' | 'assistant' | 'system',
+      role: msg.role,
       content: msg.content
     }));
 
-    try {
-      const stream = await client.chat.completions.create({
+    // Ensure base URL ends with proper endpoint
+    let url = config.baseUrl.replace(/\/$/, '');
+    if (!url.endsWith('/chat/completions')) {
+      url += '/chat/completions';
+    }
+
+    // Use fetch API directly to avoid service worker issues
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
         model: params.model,
         messages: messages,
         temperature: params.temperature || 0.7,
         max_tokens: params.maxTokens || 2000,
         stream: true
-      });
+      })
+    });
 
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content;
-        if (content) {
-          yield content;
-        }
-      }
-    } catch (error: any) {
+    if (!response.ok) {
+      const error = await response.text();
       console.error('Custom provider API error:', error);
 
-      // Handle specific error types
-      if (error.status === 401) {
+      if (response.status === 401) {
         throw new Error('Invalid API key');
-      } else if (error.status === 429) {
+      } else if (response.status === 429) {
         throw new Error('Rate limit exceeded');
-      } else if (error.status === 404) {
+      } else if (response.status === 404) {
         throw new Error('API endpoint not found - check your base URL');
-      } else if (error.status === 500) {
+      } else if (response.status === 500) {
         throw new Error('Server error');
-      } else if (error.code === 'ECONNREFUSED') {
-        throw new Error('Connection refused - check your base URL');
       } else {
-        throw new Error(error.message || 'Custom provider request failed');
+        throw new Error(`Custom provider request failed: ${response.statusText}`);
       }
+    }
+
+    // Parse SSE stream
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Failed to get response stream');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                yield content;
+              }
+            } catch (e) {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
     }
   }
 

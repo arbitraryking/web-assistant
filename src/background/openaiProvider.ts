@@ -1,7 +1,6 @@
 // OpenAI Provider Implementation
 import { LLMProvider, ChatParams } from './llmService';
 import { Settings } from '../shared/types/settings';
-import OpenAI from 'openai';
 
 export class OpenAIProvider implements LLMProvider {
   name = 'openai';
@@ -22,7 +21,7 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   /**
-   * Send chat request to OpenAI with streaming
+   * Send chat request to OpenAI with streaming using fetch API
    */
   async *chat(params: ChatParams): AsyncGenerator<string, void, unknown> {
     const apiKey = await this.getApiKey();
@@ -31,45 +30,80 @@ export class OpenAIProvider implements LLMProvider {
       throw new Error('OpenAI API key not found');
     }
 
-    const openai = new OpenAI({
-      apiKey: apiKey,
-      dangerouslyAllowBrowser: true // Running in service worker
-    });
-
     // Convert ChatMessage[] to OpenAI message format
     const messages = params.messages.map((msg) => ({
-      role: msg.role as 'user' | 'assistant' | 'system',
+      role: msg.role,
       content: msg.content
     }));
 
-    try {
-      const stream = await openai.chat.completions.create({
+    // Use fetch API directly to avoid service worker issues with OpenAI SDK
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
         model: params.model,
         messages: messages,
         temperature: params.temperature || 0.7,
         max_tokens: params.maxTokens || 2000,
         stream: true
-      });
+      })
+    });
 
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content;
-        if (content) {
-          yield content;
-        }
-      }
-    } catch (error: any) {
+    if (!response.ok) {
+      const error = await response.text();
       console.error('OpenAI API error:', error);
 
-      // Handle specific error types
-      if (error.status === 401) {
+      if (response.status === 401) {
         throw new Error('Invalid API key');
-      } else if (error.status === 429) {
+      } else if (response.status === 429) {
         throw new Error('Rate limit exceeded');
-      } else if (error.status === 500) {
+      } else if (response.status === 500) {
         throw new Error('OpenAI server error');
       } else {
-        throw new Error(error.message || 'OpenAI request failed');
+        throw new Error(`OpenAI request failed: ${response.statusText}`);
       }
+    }
+
+    // Parse SSE stream
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Failed to get response stream');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                yield content;
+              }
+            } catch (e) {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
     }
   }
 
