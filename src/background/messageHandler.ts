@@ -19,11 +19,11 @@ export class MessageHandler {
   /**
    * Handle incoming messages and route them to appropriate handlers
    */
-  async handle(
+  handle(
     message: BaseMessage,
     sender: MessageSender,
     sendResponse: SendResponse
-  ): Promise<boolean> {
+  ): boolean {
     console.log('MessageHandler: Received message', message.type, message);
 
     try {
@@ -34,31 +34,61 @@ export class MessageHandler {
 
         case MessageType.CHAT_MESSAGE:
           if (isChatMessage(message)) {
-            this.handleChatMessage(message, sendResponse);
+            this.handleChatMessage(message, sendResponse).catch((err) => {
+              console.error('Error in handleChatMessage:', err);
+              sendResponse({
+                success: false,
+                error: err.message || 'Failed to handle chat message'
+              });
+            });
             return true; // Async response
           }
           break;
 
         case MessageType.SUMMARIZE_PAGE:
           if (isSummarizePage(message)) {
-            this.handleSummarizePage(message, sender, sendResponse);
+            this.handleSummarizePage(message, sender, sendResponse).catch((err) => {
+              console.error('Error in handleSummarizePage:', err);
+              sendResponse({
+                success: false,
+                error: err.message || 'Failed to summarize page'
+              });
+            });
             return true; // Async response
           }
           break;
 
         case MessageType.GET_PAGE_CONTENT:
           if (isGetPageContent(message)) {
-            this.handleGetPageContent(sender, sendResponse);
+            this.handleGetPageContent(sender, sendResponse).catch((err) => {
+              console.error('Error in handleGetPageContent:', err);
+              sendResponse({
+                success: false,
+                error: err.message || 'Failed to get page content'
+              });
+            });
             return true; // Async response
           }
           break;
 
         case MessageType.GET_SETTINGS:
-          this.handleGetSettings(sendResponse);
+          this.handleGetSettings(sendResponse).catch((err) => {
+            console.error('Error in handleGetSettings:', err);
+            sendResponse({
+              success: false,
+              error: err.message || 'Failed to get settings'
+            });
+          });
           return true; // Async response
 
         case MessageType.SAVE_SETTINGS:
-          this.handleSaveSettings(message.data, sendResponse);
+          this.handleSaveSettings(message.data, sendResponse).catch((err) => {
+            console.error('Error in handleSaveSettings:', err);
+            sendResponse({
+              success: false,
+              error: err.message || 'Failed to save settings'
+            });
+          });
           return true; // Async response
 
         case MessageType.CONTENT_SCRIPT_READY:
