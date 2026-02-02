@@ -238,12 +238,35 @@ export class MessageHandler {
     _sender: MessageSender,
     sendResponse: SendResponse
   ): Promise<void> {
-    console.log('TODO: Handle get page content');
-    // This will be implemented in Step 7 (Content Extraction)
-    sendResponse({
-      success: true,
-      message: 'Content extraction will be implemented in Step 7'
-    });
+    try {
+      // Get active tab
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+      if (!tab.id) {
+        throw new Error('No active tab found');
+      }
+
+      // Request content from content script
+      const response = await this.sendToContentScript(tab.id, {
+        type: MessageType.GET_PAGE_CONTENT,
+        timestamp: Date.now()
+      });
+
+      if (response.success) {
+        sendResponse({
+          success: true,
+          data: response.data
+        });
+      } else {
+        throw new Error(response.error || 'Failed to get page content');
+      }
+    } catch (error: any) {
+      console.error('Error getting page content:', error);
+      sendResponse({
+        success: false,
+        error: error.message || 'Failed to get page content'
+      });
+    }
   }
 
   /**
