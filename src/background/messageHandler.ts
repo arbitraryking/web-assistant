@@ -346,7 +346,12 @@ export class MessageHandler {
 
 1. A brief overview (2-3 sentences)
 2. Key points (bullet list of main topics)
-3. For each key point, include the first few words that appear in the content so I can find it.
+
+For each key point, indicate the approximate location using this format:
+- [Point 1] Location: "first 15-20 words from that section"
+- [Point 2] Location: "first 15-20 words from that section"
+
+Use actual quotes from the page content (inside quotes) so I can find and highlight these sections.
 
 Keep the summary concise and focused on the most important information.`;
   }
@@ -357,18 +362,77 @@ Keep the summary concise and focused on the most important information.`;
   private parseHighlightsFromSummary(summary: string, pageContent: string): any[] {
     const highlights: any[] = [];
 
-    // Try to extract quoted text or keywords that might be in the summary
-    const quotes = summary.match(/"([^"]+)"/g) || [];
+    console.log('[Highlight Parser] Parsing summary, length:', summary.length);
+    console.log('[Highlight Parser] Page content length:', pageContent.length);
 
-    quotes.slice(0, 5).forEach((quote, index) => {
+    // First try to parse as JSON (if LLM returned structured format)
+    try {
+      const jsonMatch = summary.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        console.log('[Highlight Parser] Found JSON in summary');
+        const parsed = JSON.parse(jsonMatch[0]);
+
+        // Handle different JSON structures
+        const sections = parsed.sections || parsed.key_points || [];
+        console.log('[Highlight Parser] Found sections:', sections.length);
+
+        for (const section of sections) {
+          const snippet = section.textSnippet || section.quote || section.location || section.text;
+          if (snippet && typeof snippet === 'string' && snippet.length > 10) {
+            const cleanSnippet = snippet.replace(/^["']|["']$/g, '').trim();
+            const existsInContent = pageContent.toLowerCase().includes(cleanSnippet.toLowerCase());
+
+            console.log('[Highlight Parser] Snippet:', cleanSnippet.substring(0, 50) + '...');
+            console.log('[Highlight Parser] Exists in content:', existsInContent);
+
+            if (existsInContent) {
+              highlights.push({
+                id: `highlight_${highlights.length}`,
+                textSnippet: cleanSnippet,
+                scrollTo: highlights.length === 0,
+                animateScroll: true,
+                style: {
+                  backgroundColor: 'rgba(255, 235, 59, 0.3)',
+                  border: '2px solid rgba(255, 193, 7, 0.8)'
+                },
+                duration: 30000
+              });
+            }
+          }
+        }
+
+        console.log('[Highlight Parser] Total highlights from JSON:', highlights.length);
+        if (highlights.length > 0) return highlights;
+      }
+    } catch (e) {
+      console.log('[Highlight Parser] JSON parsing failed:', e);
+      // Not JSON, continue with regex parsing
+    }
+
+    // Fall back to regex for quoted text
+    const quotes = summary.match(/"([^"]{15,150})"/g) || [];
+    console.log('[Highlight Parser] Found quotes:', quotes.length);
+    const locationPattern = /Location:\s*"([^"]{15,150})"/gi;
+    let locationMatch;
+    const locations: string[] = [];
+
+    // First extract explicit "Location:" quotes
+    while ((locationMatch = locationPattern.exec(summary)) !== null) {
+      locations.push(locationMatch[1]);
+    }
+
+    // Use explicit locations first, then fall back to other quotes
+    const allQuotes = [...locations, ...quotes.filter(q => !locations.includes(q.replace(/"/g, '')))];
+
+    allQuotes.slice(0, 5).forEach((quote) => {
       const text = quote.replace(/"/g, '').trim();
 
       // Only create highlight if text is long enough and exists in content
       if (text.length > 10 && pageContent.toLowerCase().includes(text.toLowerCase())) {
         highlights.push({
-          id: `highlight_${index}`,
+          id: `highlight_${highlights.length}`,
           textSnippet: text,
-          scrollTo: index === 0, // Only scroll to first highlight
+          scrollTo: highlights.length === 0, // Only scroll to first highlight
           animateScroll: true,
           style: {
             backgroundColor: 'rgba(255, 235, 59, 0.3)',
@@ -378,6 +442,8 @@ Keep the summary concise and focused on the most important information.`;
         });
       }
     });
+
+    console.log('[Highlight Parser] Total highlights from regex:', highlights.length);
 
     return highlights;
   }

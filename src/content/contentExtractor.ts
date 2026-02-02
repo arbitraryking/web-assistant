@@ -15,7 +15,7 @@ export function extractPageContent(): PageContent | null {
     const article = reader.parse();
 
     if (!article) {
-      console.warn('Readability could not parse the page');
+      console.warn('[Content Extractor] Readability could not parse the page, using fallback');
       return fallbackExtraction();
     }
 
@@ -31,9 +31,13 @@ export function extractPageContent(): PageContent | null {
       }
     };
 
+    console.log('[Content Extractor] Extracted content length:', content.content.length);
+    console.log('[Content Extractor] Title:', content.title);
+    console.log('[Content Extractor] First 200 chars:', content.content.substring(0, 200));
+
     return content;
   } catch (error) {
-    console.error('Error extracting page content:', error);
+    console.error('[Content Extractor] Error extracting page content:', error);
     return fallbackExtraction();
   }
 }
