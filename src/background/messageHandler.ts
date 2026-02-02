@@ -224,9 +224,18 @@ export class MessageHandler {
       // Get active tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-      if (!tab.id) {
-        throw new Error('No active tab found');
+      if (!tab.id || tab.url?.startsWith('chrome://')) {
+        sendResponse({
+          success: false,
+          error: tab.url?.startsWith('chrome://')
+            ? 'Cannot summarize Chrome pages'
+            : 'No active tab found'
+        });
+        return;
       }
+
+      // Ensure content script is loaded
+      await this.ensureContentScriptLoaded(tab.id);
 
       // Get page content from content script
       const contentResponse = await this.sendToContentScript(tab.id, {
@@ -483,6 +492,42 @@ Keep the summary concise and focused on the most important information.`;
         }
       });
     });
+  }
+
+  /**
+   * Ensure content script is loaded in the tab
+   */
+  private async ensureContentScriptLoaded(tabId: number): Promise<void> {
+    try {
+      // Try to ping the content script
+      await this.sendToContentScript(tabId, {
+        type: MessageType.PING,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      // Content script not loaded, inject it
+      console.log('Content script not loaded, injecting...');
+      try {
+        // Get the content script file from manifest
+        const manifest = chrome.runtime.getManifest();
+        const contentScript = manifest.content_scripts?.[0]?.js?.[0];
+
+        if (!contentScript) {
+          throw new Error('Content script not found in manifest');
+        }
+
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          files: [contentScript]
+        });
+
+        // Wait a bit for the script to initialize
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (injectError) {
+        console.error('Failed to inject content script:', injectError);
+        throw new Error('Failed to load content script. Please refresh the page and try again.');
+      }
+    }
   }
 
   /**
