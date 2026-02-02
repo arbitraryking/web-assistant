@@ -1,4 +1,7 @@
 // Background service worker for LLM Chrome Extension
+import { messageHandler } from './messageHandler';
+import { BaseMessage } from '../shared/types/messages';
+
 console.log('LLM Assistant: Background service worker loaded');
 
 // Set up side panel on extension install
@@ -13,20 +16,15 @@ chrome.action.onClicked.addListener((tab) => {
   }
 });
 
-// Message listener (will be expanded later)
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  console.log('Background received message:', message);
+// Message listener - route all messages through the message handler
+chrome.runtime.onMessage.addListener((message: BaseMessage, sender, sendResponse) => {
+  console.log('Background received message:', message.type);
 
-  // Handle different message types
-  switch (message.type) {
-    case 'PING':
-      sendResponse({ success: true, message: 'PONG' });
-      break;
-    default:
-      console.log('Unknown message type:', message.type);
-  }
+  // Use message handler to process the message
+  const shouldKeepChannelOpen = messageHandler.handle(message, sender, sendResponse);
 
-  return true; // Keep channel open for async response
+  // Return true if we need to keep the channel open for async response
+  return shouldKeepChannelOpen;
 });
 
 // Keep service worker alive during streaming (prevent premature termination)
