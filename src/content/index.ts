@@ -1,6 +1,7 @@
 // Content script for LLM Chrome Extension
-import { MessageType } from '../shared/types/messages';
+import { MessageType, HighlightInstruction } from '../shared/types/messages';
 import { extractPageContent, extractHeadingsStructure } from './contentExtractor';
+import { highlighter } from './highlighter';
 
 console.log('LLM Assistant: Content script loaded on', window.location.href);
 
@@ -43,15 +44,30 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       break;
 
     case MessageType.HIGHLIGHT_CONTENT:
-      // Will be implemented in Step 8
-      console.log('TODO: Handle highlight content');
-      sendResponse({ success: true, message: 'Highlighting will be implemented in Step 8' });
+      try {
+        const instructions: HighlightInstruction[] = message.data?.instructions || [];
+        highlighter.highlight(instructions);
+        sendResponse({ success: true });
+      } catch (error: any) {
+        console.error('Error highlighting content:', error);
+        sendResponse({
+          success: false,
+          error: error.message || 'Failed to highlight content'
+        });
+      }
       break;
 
     case MessageType.CLEAR_HIGHLIGHTS:
-      // Will be implemented in Step 8
-      console.log('TODO: Handle clear highlights');
-      sendResponse({ success: true, message: 'Clear highlights will be implemented in Step 8' });
+      try {
+        highlighter.clearHighlights();
+        sendResponse({ success: true });
+      } catch (error: any) {
+        console.error('Error clearing highlights:', error);
+        sendResponse({
+          success: false,
+          error: error.message || 'Failed to clear highlights'
+        });
+      }
       break;
 
     default:
