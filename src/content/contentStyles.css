@@ -1,0 +1,36 @@
+/* Styles for content highlighting and overlays */
+
+.llm-assistant-highlight {
+  position: absolute;
+  pointer-events: none;
+  z-index: 999999;
+  transition: opacity 0.3s ease;
+}
+
+.llm-assistant-highlight.fade-in {
+  animation: highlightFadeIn 0.5s ease-in-out;
+}
+
+.llm-assistant-highlight.pulse {
+  animation: highlightPulse 2s ease-in-out infinite;
+}
+
+@keyframes highlightFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes highlightPulse {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Styles will be expanded when implementing the highlighter */
