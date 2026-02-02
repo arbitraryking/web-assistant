@@ -203,13 +203,24 @@ export class MessageHandler {
    * Handle page summarization requests
    */
   private async handleSummarizePage(
-    message: any,
+    _message: any,
     _sender: MessageSender,
     sendResponse: SendResponse
   ): Promise<void> {
-    console.log('TODO: Handle summarize page', message);
-
     try {
+      // Get settings
+      const settings = await storageService.getSettings();
+
+      // Validate settings
+      const validation = storageService.validateSettings(settings);
+      if (!validation.valid) {
+        sendResponse({
+          success: false,
+          error: validation.errors.join(', ')
+        });
+        return;
+      }
+
       // Get active tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
@@ -217,18 +228,149 @@ export class MessageHandler {
         throw new Error('No active tab found');
       }
 
-      // Request page content from content script
-      // This will be fully implemented in Step 9 (Summarization Workflow)
+      // Get page content from content script
+      const contentResponse = await this.sendToContentScript(tab.id, {
+        type: MessageType.GET_PAGE_CONTENT,
+        timestamp: Date.now()
+      });
+
+      if (!contentResponse.success || !contentResponse.data?.content) {
+        throw new Error(contentResponse.error || 'Failed to extract page content');
+      }
+
+      const pageContent = contentResponse.data.content;
+
+      // Start keep-alive
+      startKeepAlive();
+
+      // Send initial response
       sendResponse({
         success: true,
-        message: 'Summarization will be implemented in Step 9'
+        streaming: true,
+        message: 'Starting page summarization'
       });
-    } catch (error) {
+
+      // Create summarization prompt
+      const prompt = settings.customPrompts.summarize || this.getDefaultSummarizePrompt();
+      const fullPrompt = `${prompt}\n\nPage Title: ${pageContent.title}\n\nPage Content:\n${pageContent.content}`;
+
+      const messages = [
+        {
+          id: `system_${Date.now()}`,
+          role: 'system' as const,
+          content: 'You are a helpful assistant that summarizes web pages.',
+          timestamp: Date.now()
+        },
+        {
+          id: `user_${Date.now()}`,
+          role: 'user' as const,
+          content: fullPrompt,
+          timestamp: Date.now()
+        }
+      ];
+
+      // Stream response
+      const messageId = `summary_${Date.now()}`;
+      let fullResponse = '';
+
+      try {
+        for await (const chunk of llmService.chat(settings, messages)) {
+          fullResponse += chunk;
+
+          // Send chunk to side panel
+          chrome.runtime.sendMessage({
+            type: MessageType.STREAM_CHUNK,
+            data: {
+              chunk,
+              messageId
+            },
+            timestamp: Date.now()
+          });
+        }
+
+        // Parse response and extract highlights
+        const highlights = this.parseHighlightsFromSummary(fullResponse, pageContent.content);
+
+        // Send highlights to content script
+        if (highlights.length > 0) {
+          await this.sendToContentScript(tab.id, {
+            type: MessageType.HIGHLIGHT_CONTENT,
+            data: { instructions: highlights },
+            timestamp: Date.now()
+          });
+        }
+
+        // Send completion
+        chrome.runtime.sendMessage({
+          type: MessageType.STREAM_COMPLETE,
+          data: { messageId },
+          timestamp: Date.now()
+        });
+      } catch (streamError: any) {
+        chrome.runtime.sendMessage({
+          type: MessageType.ERROR,
+          data: {
+            type: 'STREAM_ERROR',
+            message: streamError.message || 'Summarization failed',
+            timestamp: Date.now()
+          },
+          timestamp: Date.now()
+        });
+      } finally {
+        stopKeepAlive();
+      }
+    } catch (error: any) {
+      console.error('Error handling summarize page:', error);
       sendResponse({
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error.message || 'Failed to summarize page'
       });
+      stopKeepAlive();
     }
+  }
+
+  /**
+   * Get default summarization prompt
+   */
+  private getDefaultSummarizePrompt(): string {
+    return `Please summarize this web page. Provide:
+
+1. A brief overview (2-3 sentences)
+2. Key points (bullet list of main topics)
+3. For each key point, include the first few words that appear in the content so I can find it.
+
+Keep the summary concise and focused on the most important information.`;
+  }
+
+  /**
+   * Parse highlights from summary response
+   */
+  private parseHighlightsFromSummary(summary: string, pageContent: string): any[] {
+    const highlights: any[] = [];
+
+    // Try to extract quoted text or keywords that might be in the summary
+    const quotes = summary.match(/"([^"]+)"/g) || [];
+
+    quotes.slice(0, 5).forEach((quote, index) => {
+      const text = quote.replace(/"/g, '').trim();
+
+      // Only create highlight if text is long enough and exists in content
+      if (text.length > 10 && pageContent.toLowerCase().includes(text.toLowerCase())) {
+        highlights.push({
+          id: `highlight_${index}`,
+          textSnippet: text,
+          scrollTo: index === 0, // Only scroll to first highlight
+          animateScroll: true,
+          style: {
+            backgroundColor: 'rgba(255, 235, 59, 0.3)',
+            border: '2px solid rgba(255, 193, 7, 0.8)'
+          },
+          duration: 30000 // 30 seconds
+        });
+      }
+    });
+
+    return highlights;
   }
 
   /**

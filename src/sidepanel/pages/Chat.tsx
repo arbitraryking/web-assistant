@@ -1,5 +1,6 @@
 import { useChat } from '../hooks/useChat';
 import { useRef, useEffect } from 'react';
+import { MessageType } from '../../shared/types/messages';
 
 function Chat() {
   const {
@@ -23,6 +24,23 @@ function Chat() {
   const handleSendMessage = () => {
     if (!input.trim() || isStreaming) return;
     sendMessage(input);
+  };
+
+  const handleSummarizePage = async () => {
+    if (isStreaming) return;
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: MessageType.SUMMARIZE_PAGE,
+        timestamp: Date.now()
+      });
+
+      if (!response.success && response.error) {
+        console.error('Failed to start summarization:', response.error);
+      }
+    } catch (err) {
+      console.error('Error summarizing page:', err);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -83,7 +101,7 @@ function Chat() {
       </div>
 
       <div className="action-buttons">
-        <button className="action-button" disabled={isStreaming}>
+        <button className="action-button" onClick={handleSummarizePage} disabled={isStreaming}>
           Summarize Page
         </button>
       </div>
