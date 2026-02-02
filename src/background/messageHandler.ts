@@ -7,6 +7,8 @@ import {
   isGetPageContent,
   ErrorInfo
 } from '../shared/types/messages';
+import { storageService } from './storageService';
+import { Settings } from '../shared/types/settings';
 
 type MessageSender = chrome.runtime.MessageSender;
 type SendResponse = (response?: any) => void;
@@ -151,27 +153,56 @@ export class MessageHandler {
    * Handle get settings requests
    */
   private async handleGetSettings(sendResponse: SendResponse): Promise<void> {
-    console.log('TODO: Handle get settings');
-    // This will be implemented in Step 4 (Settings System)
-    sendResponse({
-      success: true,
-      message: 'Settings retrieval will be implemented in Step 4'
-    });
+    try {
+      const settings = await storageService.getSettings();
+      sendResponse({
+        success: true,
+        data: settings
+      });
+    } catch (error) {
+      console.error('Error getting settings:', error);
+      sendResponse({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get settings'
+      });
+    }
   }
 
   /**
    * Handle save settings requests
    */
   private async handleSaveSettings(
-    settings: any,
+    settings: Settings,
     sendResponse: SendResponse
   ): Promise<void> {
-    console.log('TODO: Handle save settings', settings);
-    // This will be implemented in Step 4 (Settings System)
-    sendResponse({
-      success: true,
-      message: 'Settings saving will be implemented in Step 4'
-    });
+    try {
+      // Validate settings first
+      const validation = storageService.validateSettings(settings);
+
+      if (!validation.valid) {
+        sendResponse({
+          success: false,
+          error: 'Invalid settings',
+          errors: validation.errors
+        });
+        return;
+      }
+
+      // Save settings
+      await storageService.saveSettings(settings);
+
+      sendResponse({
+        success: true,
+        message: 'Settings saved successfully',
+        data: settings
+      });
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      sendResponse({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to save settings'
+      });
+    }
   }
 
   /**

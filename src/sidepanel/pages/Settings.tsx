@@ -1,28 +1,59 @@
-import { useState } from 'react';
+import { useSettings } from '../hooks/useSettings';
+import { PROVIDER_CONFIGS, LLMProvider } from '../../shared/types/settings';
 
 function Settings() {
-  const [provider, setProvider] = useState<'openai' | 'anthropic' | 'custom'>('openai');
-  const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState('gpt-4-turbo');
-  const [baseUrl, setBaseUrl] = useState('');
+  const {
+    settings,
+    loading,
+    error,
+    saving,
+    updateSetting,
+    saveSettings
+  } = useSettings();
 
-  const handleSave = () => {
-    // Save settings (will be implemented in later steps)
-    console.log('Saving settings:', { provider, apiKey, model, baseUrl });
-    alert('Settings saved! (Implementation pending)');
+  const handleSave = async () => {
+    const success = await saveSettings(settings);
+    if (success) {
+      alert('Settings saved successfully!');
+    }
   };
+
+  const providerConfig = PROVIDER_CONFIGS[settings.provider];
+
+  if (loading) {
+    return (
+      <div className="settings-container">
+        <h1>Settings</h1>
+        <p>Loading settings...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="settings-container">
       <h1>Settings</h1>
+
+      {error && (
+        <div className="error-message">
+          <strong>Error:</strong> {error}
+        </div>
+      )}
 
       <div className="settings-form">
         <div className="form-group">
           <label htmlFor="provider">LLM Provider</label>
           <select
             id="provider"
-            value={provider}
-            onChange={(e) => setProvider(e.target.value as any)}
+            value={settings.provider}
+            onChange={(e) => {
+              const newProvider = e.target.value as LLMProvider;
+              updateSetting('provider', newProvider);
+              // Update model to default for new provider
+              const config = PROVIDER_CONFIGS[newProvider];
+              if (config.defaultModel) {
+                updateSetting('model', config.defaultModel);
+              }
+            }}
           >
             <option value="openai">OpenAI</option>
             <option value="anthropic">Anthropic (Claude)</option>
@@ -35,8 +66,8 @@ function Settings() {
           <input
             id="apiKey"
             type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
+            value={settings.apiKey}
+            onChange={(e) => updateSetting('apiKey', e.target.value)}
             placeholder="Enter your API key"
           />
         </div>
@@ -45,44 +76,69 @@ function Settings() {
           <label htmlFor="model">Model</label>
           <select
             id="model"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
+            value={settings.model}
+            onChange={(e) => updateSetting('model', e.target.value)}
           >
-            {provider === 'openai' && (
-              <>
-                <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                <option value="gpt-4">GPT-4</option>
-                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-              </>
-            )}
-            {provider === 'anthropic' && (
-              <>
-                <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-                <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
-                <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
-              </>
-            )}
-            {provider === 'custom' && (
-              <option value="custom-model">Custom Model</option>
+            {providerConfig.models.length > 0 ? (
+              providerConfig.models.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.name}
+                </option>
+              ))
+            ) : (
+              <option value="">Enter custom model name</option>
             )}
           </select>
         </div>
 
-        {provider === 'custom' && (
+        {settings.provider === 'custom' && providerConfig.models.length === 0 && (
+          <div className="form-group">
+            <label htmlFor="customModel">Model Name</label>
+            <input
+              id="customModel"
+              type="text"
+              value={settings.model}
+              onChange={(e) => updateSetting('model', e.target.value)}
+              placeholder="e.g., gpt-3.5-turbo"
+            />
+          </div>
+        )}
+
+        {settings.provider === 'custom' && (
           <div className="form-group">
             <label htmlFor="baseUrl">Base URL</label>
             <input
               id="baseUrl"
               type="url"
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
+              value={settings.baseUrl || ''}
+              onChange={(e) => updateSetting('baseUrl', e.target.value)}
               placeholder="https://api.example.com/v1"
             />
           </div>
         )}
 
-        <button className="save-button" onClick={handleSave}>
-          Save Settings
+        <div className="form-group">
+          <label htmlFor="temperature">
+            Temperature ({settings.temperature})
+          </label>
+          <input
+            id="temperature"
+            type="range"
+            min="0"
+            max="2"
+            step="0.1"
+            value={settings.temperature}
+            onChange={(e) => updateSetting('temperature', parseFloat(e.target.value))}
+          />
+          <small>Lower = more focused, Higher = more creative</small>
+        </div>
+
+        <button
+          className="save-button"
+          onClick={handleSave}
+          disabled={saving || !settings.apiKey}
+        >
+          {saving ? 'Saving...' : 'Save Settings'}
         </button>
       </div>
 

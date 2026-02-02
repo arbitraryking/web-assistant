@@ -185,6 +185,16 @@ body {
   color: #333;
 }
 
+.error-message {
+  background-color: #fee2e2;
+  border: 1px solid #ef4444;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 16px;
+  color: #991b1b;
+  font-size: 14px;
+}
+
 .settings-form {
   background-color: #fff;
   border-radius: 8px;
@@ -222,6 +232,19 @@ body {
 .form-group input:focus,
 .form-group select:focus {
   border-color: #2563eb;
+}
+
+.form-group input[type="range"] {
+  padding: 0;
+  border: none;
+  cursor: pointer;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6b7280;
 }
 
 .save-button {
