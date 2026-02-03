@@ -247,6 +247,17 @@ export class MessageHandler {
       // Ensure content script is loaded
       await this.ensureContentScriptLoaded(tab.id);
 
+      // Send progress: extracting content
+      chrome.runtime.sendMessage({
+        type: MessageType.PROGRESS,
+        data: {
+          stage: 'extracting_content',
+          message: 'Extracting page content...',
+          progress: 10
+        },
+        timestamp: Date.now()
+      });
+
       // Get page content from content script
       const contentResponse = await this.sendToContentScript(tab.id, {
         type: MessageType.GET_PAGE_CONTENT,
@@ -278,6 +289,17 @@ export class MessageHandler {
         success: true,
         streaming: true,
         message: 'Starting page summarization'
+      });
+
+      // Send progress: generating summary
+      chrome.runtime.sendMessage({
+        type: MessageType.PROGRESS,
+        data: {
+          stage: 'generating_summary',
+          message: 'Generating summary with AI...',
+          progress: 30
+        },
+        timestamp: Date.now()
       });
 
       // Create summarization prompt
@@ -318,6 +340,17 @@ export class MessageHandler {
           });
         }
 
+        // Send progress: creating highlights
+        chrome.runtime.sendMessage({
+          type: MessageType.PROGRESS,
+          data: {
+            stage: 'creating_highlights',
+            message: 'Creating page highlights...',
+            progress: 80
+          },
+          timestamp: Date.now()
+        });
+
         // Parse response and extract highlights and summary structure
         const parsedSummary = this.parseSummaryStructure(fullResponse);
         const highlights = this.parseHighlightsFromSummary(fullResponse, pageContent.content);
@@ -350,6 +383,17 @@ export class MessageHandler {
         chrome.runtime.sendMessage({
           type: MessageType.STREAM_COMPLETE,
           data: { messageId },
+          timestamp: Date.now()
+        });
+
+        // Send progress: complete (will be cleared by side panel)
+        chrome.runtime.sendMessage({
+          type: MessageType.PROGRESS,
+          data: {
+            stage: 'complete',
+            message: 'Summary complete!',
+            progress: 100
+          },
           timestamp: Date.now()
         });
       } catch (streamError: any) {

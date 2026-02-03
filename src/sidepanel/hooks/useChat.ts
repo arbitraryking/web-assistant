@@ -1,6 +1,6 @@
 // Hook for managing chat state and communication with background
 import { useState, useEffect, useCallback } from 'react';
-import { ChatMessage, MessageType, HighlightResult, SummarySection } from '../../shared/types/messages';
+import { ChatMessage, MessageType, HighlightResult, SummarySection, Progress } from '../../shared/types/messages';
 
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -18,6 +18,7 @@ export function useChat() {
   const [highlights, setHighlights] = useState<HighlightResult[]>([]); // Track current highlights
   const [summary, setSummary] = useState<{ overview: string; sections: SummarySection[]; pageTitle: string; pageUrl: string } | null>(null);
   const [summaryExpanded, setSummaryExpanded] = useState(true); // Summary panel collapse state
+  const [summarizationProgress, setSummarizationProgress] = useState<Progress | null>(null); // Track summarization progress
 
   /**
    * Listen for streaming chunks from background
@@ -35,6 +36,7 @@ export function useChat() {
         case MessageType.STREAM_COMPLETE:
           // Finalize streaming message
           setIsStreaming(false);
+          setSummarizationProgress(null); // Clear progress on complete
           if (streamingMessage) {
             const assistantMessage: ChatMessage = {
               id: message.data.messageId,
@@ -57,11 +59,25 @@ export function useChat() {
           // Store structured summary data
           console.log('Summary ready:', message.data.summary);
           setSummary(message.data.summary || null);
+          setSummarizationProgress(null); // Clear progress when summary is ready
+          break;
+
+        case MessageType.PROGRESS:
+          // Update progress
+          console.log('Progress:', message.data);
+          const progress = message.data;
+          // Clear progress if complete
+          if (progress.stage === 'complete') {
+            setSummarizationProgress(null);
+          } else {
+            setSummarizationProgress(progress);
+          }
           break;
 
         case MessageType.ERROR:
           // Handle error
           setIsStreaming(false);
+          setSummarizationProgress(null); // Clear progress on error
           setError(message.data.message || 'An error occurred');
           setStreamingMessage('');
           break;
@@ -132,6 +148,7 @@ export function useChat() {
     setStreamingMessage('');
     setHighlights([]);
     setSummary(null);
+    setSummarizationProgress(null);
   }, []);
 
   /**
@@ -167,6 +184,7 @@ export function useChat() {
     highlights,
     summary,
     summaryExpanded,
+    summarizationProgress,
     toggleSummary,
     sendMessage,
     clearChat,

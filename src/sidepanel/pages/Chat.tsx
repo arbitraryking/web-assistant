@@ -13,6 +13,7 @@ function Chat() {
     highlights,
     summary,
     summaryExpanded,
+    summarizationProgress,
     toggleSummary,
     sendMessage,
     clearChat,
@@ -70,6 +71,24 @@ function Chat() {
       {error && (
         <div className="error-banner">
           <strong>Error:</strong> {error}
+        </div>
+      )}
+
+      {/* Summarization progress indicator */}
+      {summarizationProgress && (
+        <div className="progress-banner">
+          <div className="progress-header">
+            <div className="progress-spinner"></div>
+            <span className="progress-message">{summarizationProgress.message}</span>
+          </div>
+          {summarizationProgress.progress !== undefined && (
+            <div className="progress-bar-container">
+              <div
+                className="progress-bar-fill"
+                style={{ width: `${summarizationProgress.progress}%` }}
+              ></div>
+            </div>
+          )}
         </div>
       )}
 

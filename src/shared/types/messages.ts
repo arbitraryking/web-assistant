@@ -26,7 +26,14 @@ export enum MessageType {
   // General
   ERROR = 'ERROR',
   PING = 'PING',
-  CONTENT_SCRIPT_READY = 'CONTENT_SCRIPT_READY'
+  CONTENT_SCRIPT_READY = 'CONTENT_SCRIPT_READY',
+  PROGRESS = 'PROGRESS'
+}
+
+export interface Progress {
+  stage: 'extracting_content' | 'generating_summary' | 'creating_highlights' | 'complete';
+  message: string;
+  progress?: number; // 0-100 for optional progress percentage
 }
 
 // Base message structure
@@ -179,6 +186,11 @@ export interface SummaryReadyResponse extends BaseMessage {
 export interface ErrorResponse extends BaseMessage {
   type: MessageType.ERROR;
   data: ErrorInfo;
+}
+
+export interface ProgressResponse extends BaseMessage {
+  type: MessageType.PROGRESS;
+  data: Progress;
 }
 
 // Type guard helpers
