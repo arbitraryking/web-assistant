@@ -11,6 +11,9 @@ function Chat() {
     error,
     streamingMessage,
     highlights,
+    summary,
+    summaryExpanded,
+    toggleSummary,
     sendMessage,
     clearChat,
     scrollToHighlight
@@ -102,31 +105,69 @@ function Chat() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Highlight links section */}
-      {highlights.length > 0 && (
-        <div className="highlights-section">
-          <div className="highlights-header">
-            <h3>Highlighted Sections</h3>
-            <span className="highlights-count">{highlights.length}</span>
-          </div>
-          <div className="highlights-list">
-            {highlights.map((highlight, index) => (
+      {/* Summary panel with overview and section cards */}
+      {summary && (
+        <div className={`summary-panel ${!summaryExpanded ? 'collapsed' : ''}`}>
+          <div className="summary-header">
+            <div className="summary-header-left">
               <button
-                key={highlight.id}
-                className="highlight-link"
-                onClick={() => scrollToHighlight(highlight.id)}
-                title={highlight.textSnippet}
+                className="summary-toggle"
+                onClick={toggleSummary}
+                title={summaryExpanded ? 'Collapse summary' : 'Expand summary'}
               >
-                <span className="highlight-index">{index + 1}</span>
-                <span className="highlight-text">
-                  {highlight.textSnippet.length > 60
-                    ? highlight.textSnippet.substring(0, 60) + '...'
-                    : highlight.textSnippet}
-                </span>
-                <span className="highlight-element">{highlight.element}</span>
+                {summaryExpanded ? '▼' : '▶'}
               </button>
-            ))}
+              <h3>{summaryExpanded ? 'Page Summary' : 'Page Summary (collapsed)'}</h3>
+            </div>
+            <button className="summary-close" onClick={clearChat} title="Close summary">
+              ×
+            </button>
           </div>
+
+          {summaryExpanded && (
+            <>
+              {summary.pageTitle && (
+                <div className="summary-page-title">{summary.pageTitle}</div>
+              )}
+
+              {summary.overview && (
+                <div className="summary-overview">
+                  <h4>Overview</h4>
+                  <p>{summary.overview}</p>
+                </div>
+              )}
+
+              {summary.sections && summary.sections.length > 0 && (
+                <div className="summary-sections">
+                  <h4>Key Sections</h4>
+                  <div className="section-cards">
+                    {summary.sections.map((section, index) => (
+                      <div
+                        key={section.id || index}
+                        className="section-card"
+                        onClick={() => {
+                          // Find corresponding highlight and scroll to it
+                          const highlight = highlights[index];
+                          if (highlight) {
+                            scrollToHighlight(highlight.id);
+                          }
+                        }}
+                      >
+                        <div className="section-card-header">
+                          <span className="section-index">{index + 1}</span>
+                          <h5 className="section-title">{section.title}</h5>
+                        </div>
+                        <p className="section-summary">{section.summary}</p>
+                        <div className="section-card-footer">
+                          <span className="section-hint">Click to jump to section</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 

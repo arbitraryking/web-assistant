@@ -318,8 +318,24 @@ export class MessageHandler {
           });
         }
 
-        // Parse response and extract highlights
+        // Parse response and extract highlights and summary structure
+        const parsedSummary = this.parseSummaryStructure(fullResponse);
         const highlights = this.parseHighlightsFromSummary(fullResponse, pageContent.content);
+
+        // Send structured summary to side panel
+        if (parsedSummary) {
+          chrome.runtime.sendMessage({
+            type: MessageType.SUMMARY_READY,
+            data: {
+              summary: {
+                ...parsedSummary,
+                pageTitle: pageContent.title,
+                pageUrl: pageContent.url
+              }
+            },
+            timestamp: Date.now()
+          });
+        }
 
         // Send highlights to content script
         if (highlights.length > 0) {
@@ -375,6 +391,67 @@ For each key point, indicate the approximate location using this format:
 Use actual quotes from the page content (inside quotes) so I can find and highlight these sections.
 
 Keep the summary concise and focused on the most important information.`;
+  }
+
+  /**
+   * Parse summary structure from LLM response
+   * Extracts overview and sections for the summary panel
+   */
+  private parseSummaryStructure(summary: string): { overview: string; sections: any[] } | null {
+    console.log('[Summary Parser] Parsing summary structure');
+
+    // Try to parse as JSON first
+    try {
+      const jsonMatch = summary.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        console.log('[Summary Parser] Found JSON structure');
+
+        const sections = (parsed.sections || parsed.key_points || []).map((section: any, index: number) => ({
+          id: section.id || `section_${index}`,
+          title: section.title || section.section || `Section ${index + 1}`,
+          summary: section.summary || section.description || '',
+          textSnippet: section.textSnippet || section.quote || section.location || section.text || '',
+          importance: section.importance || 'medium'
+        }));
+
+        return {
+          overview: parsed.overview || parsed.description || '',
+          sections
+        };
+      }
+    } catch (e) {
+      console.log('[Summary Parser] JSON parsing failed, will try text parsing');
+    }
+
+    // Fallback: Try to extract overview and sections from text format
+    const overviewMatch = summary.match(/(?:overview|summary|introduction)[:\s]*([^:\n]*)/i);
+    const overview = overviewMatch ? overviewMatch[1].trim() : '';
+
+    // Extract bullet points or numbered list as sections
+    const sectionMatches = summary.matchAll(/(?:[-•*]|\d+\.)\s+(.+?)(?=\n\s*(?:[-•*]|\d+\.|$))/gs);
+    const sections: any[] = [];
+
+    for (const match of sectionMatches) {
+      const text = match[1].trim();
+      // Extract location from the section text
+      const locationMatch = text.match(/location[:\s]*"([^"]+)"/i);
+      const textSnippet = locationMatch ? locationMatch[1] : text.substring(0, 100);
+
+      sections.push({
+        id: `section_${sections.length}`,
+        title: text.split(':')[0].substring(0, 50) || `Section ${sections.length + 1}`,
+        summary: text.replace(/location[:\s]*"[^"]*"/i, '').trim(),
+        textSnippet,
+        importance: 'medium'
+      });
+    }
+
+    if (overview || sections.length > 0) {
+      return { overview, sections };
+    }
+
+    return null;
   }
 
   /**

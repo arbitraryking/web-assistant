@@ -16,6 +16,7 @@ export enum MessageType {
   CLEAR_HIGHLIGHTS = 'CLEAR_HIGHLIGHTS',
   SCROLL_TO_HIGHLIGHT = 'SCROLL_TO_HIGHLIGHT',
   HIGHLIGHTS_READY = 'HIGHLIGHTS_READY',
+  SUMMARY_READY = 'SUMMARY_READY',
 
   // Settings
   GET_SETTINGS = 'GET_SETTINGS',
@@ -86,6 +87,7 @@ export interface SummaryResult {
 }
 
 export interface SummarySection {
+  id?: string;
   title: string;
   summary: string;
   importance: 'high' | 'medium' | 'low';
@@ -162,6 +164,16 @@ export interface HighlightResult {
   id: string;
   textSnippet: string;
   element: string; // Human-readable description
+}
+
+export interface SummaryReadyResponse extends BaseMessage {
+  type: MessageType.SUMMARY_READY;
+  data: {
+    overview: string;
+    sections: SummarySection[];
+    pageTitle: string;
+    pageUrl: string;
+  };
 }
 
 export interface ErrorResponse extends BaseMessage {

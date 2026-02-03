@@ -1,6 +1,6 @@
 // Hook for managing chat state and communication with background
 import { useState, useEffect, useCallback } from 'react';
-import { ChatMessage, MessageType, HighlightResult } from '../../shared/types/messages';
+import { ChatMessage, MessageType, HighlightResult, SummarySection } from '../../shared/types/messages';
 
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -16,6 +16,8 @@ export function useChat() {
   const [error, setError] = useState<string | null>(null);
   const [streamingMessage, setStreamingMessage] = useState('');
   const [highlights, setHighlights] = useState<HighlightResult[]>([]); // Track current highlights
+  const [summary, setSummary] = useState<{ overview: string; sections: SummarySection[]; pageTitle: string; pageUrl: string } | null>(null);
+  const [summaryExpanded, setSummaryExpanded] = useState(true); // Summary panel collapse state
 
   /**
    * Listen for streaming chunks from background
@@ -49,6 +51,12 @@ export function useChat() {
           // Store highlights for display
           console.log('Highlights ready:', message.data.highlights);
           setHighlights(message.data.highlights || []);
+          break;
+
+        case MessageType.SUMMARY_READY:
+          // Store structured summary data
+          console.log('Summary ready:', message.data.summary);
+          setSummary(message.data.summary || null);
           break;
 
         case MessageType.ERROR:
@@ -123,6 +131,7 @@ export function useChat() {
     setError(null);
     setStreamingMessage('');
     setHighlights([]);
+    setSummary(null);
   }, []);
 
   /**
@@ -144,6 +153,10 @@ export function useChat() {
     }
   }, []);
 
+  const toggleSummary = useCallback(() => {
+    setSummaryExpanded(prev => !prev);
+  }, []);
+
   return {
     messages,
     input,
@@ -152,6 +165,9 @@ export function useChat() {
     error,
     streamingMessage,
     highlights,
+    summary,
+    summaryExpanded,
+    toggleSummary,
     sendMessage,
     clearChat,
     scrollToHighlight
