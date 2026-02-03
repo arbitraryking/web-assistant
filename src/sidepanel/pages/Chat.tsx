@@ -10,8 +10,10 @@ function Chat() {
     isStreaming,
     error,
     streamingMessage,
+    highlights,
     sendMessage,
-    clearChat
+    clearChat,
+    scrollToHighlight
   } = useChat();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -99,6 +101,34 @@ function Chat() {
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Highlight links section */}
+      {highlights.length > 0 && (
+        <div className="highlights-section">
+          <div className="highlights-header">
+            <h3>Highlighted Sections</h3>
+            <span className="highlights-count">{highlights.length}</span>
+          </div>
+          <div className="highlights-list">
+            {highlights.map((highlight, index) => (
+              <button
+                key={highlight.id}
+                className="highlight-link"
+                onClick={() => scrollToHighlight(highlight.id)}
+                title={highlight.textSnippet}
+              >
+                <span className="highlight-index">{index + 1}</span>
+                <span className="highlight-text">
+                  {highlight.textSnippet.length > 60
+                    ? highlight.textSnippet.substring(0, 60) + '...'
+                    : highlight.textSnippet}
+                </span>
+                <span className="highlight-element">{highlight.element}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="action-buttons">
         <button className="action-button" onClick={handleSummarizePage} disabled={isStreaming}>

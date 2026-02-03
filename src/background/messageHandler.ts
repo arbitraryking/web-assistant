@@ -91,6 +91,16 @@ export class MessageHandler {
           });
           return true; // Async response
 
+        case MessageType.SCROLL_TO_HIGHLIGHT:
+          this.handleScrollToHighlight(message, sender, sendResponse).catch((err) => {
+            console.error('Error in handleScrollToHighlight:', err);
+            sendResponse({
+              success: false,
+              error: err.message || 'Failed to scroll to highlight'
+            });
+          });
+          return true; // Async response
+
         case MessageType.CONTENT_SCRIPT_READY:
           console.log('Content script ready on:', message.data?.url || 'unknown URL');
           sendResponse({ success: true });
@@ -249,6 +259,17 @@ export class MessageHandler {
 
       const pageContent = contentResponse.data.content;
 
+      // Debug: Log parsed content for inspection
+      console.log('=== PAGE CONTENT DEBUG INFO ===');
+      console.log('Title:', pageContent.title);
+      console.log('URL:', pageContent.url);
+      console.log('Content Length:', pageContent.content.length);
+      console.log('Content Preview (first 500 chars):');
+      console.log(pageContent.content.substring(0, 500));
+      console.log('Content Preview (last 500 chars):');
+      console.log(pageContent.content.substring(pageContent.content.length - 500));
+      console.log('==============================');
+
       // Start keep-alive
       startKeepAlive();
 
@@ -380,10 +401,10 @@ Keep the summary concise and focused on the most important information.`;
           const snippet = section.textSnippet || section.quote || section.location || section.text;
           if (snippet && typeof snippet === 'string' && snippet.length > 10) {
             const cleanSnippet = snippet.replace(/^["']|["']$/g, '').trim();
-            const existsInContent = pageContent.toLowerCase().includes(cleanSnippet.toLowerCase());
-
+            // const existsInContent = pageContent.toLowerCase().includes(cleanSnippet.toLowerCase());
+            const existsInContent = true
             console.log('[Highlight Parser] Snippet:', cleanSnippet.substring(0, 50) + '...');
-            console.log('[Highlight Parser] Exists in content:', existsInContent);
+            // console.log('[Highlight Parser] Exists in content:', existsInContent);
 
             if (existsInContent) {
               highlights.push({
@@ -395,7 +416,7 @@ Keep the summary concise and focused on the most important information.`;
                   backgroundColor: 'rgba(255, 235, 59, 0.3)',
                   border: '2px solid rgba(255, 193, 7, 0.8)'
                 },
-                duration: 30000
+                // duration: 30000
               });
             }
           }
@@ -438,7 +459,7 @@ Keep the summary concise and focused on the most important information.`;
             backgroundColor: 'rgba(255, 235, 59, 0.3)',
             border: '2px solid rgba(255, 193, 7, 0.8)'
           },
-          duration: 30000 // 30 seconds
+          // duration: 30000 // 30 seconds
         });
       }
     });
@@ -538,6 +559,35 @@ Keep the summary concise and focused on the most important information.`;
       sendResponse({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to save settings'
+      });
+    }
+  }
+
+  /**
+   * Handle scroll to highlight requests
+   */
+  private async handleScrollToHighlight(
+    message: any,
+    _sender: MessageSender,
+    sendResponse: SendResponse
+  ): Promise<void> {
+    try {
+      // Get active tab
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+      if (!tab.id) {
+        throw new Error('No active tab found');
+      }
+
+      // Forward to content script
+      const response = await this.sendToContentScript(tab.id, message);
+
+      sendResponse(response);
+    } catch (error: any) {
+      console.error('Error scrolling to highlight:', error);
+      sendResponse({
+        success: false,
+        error: error.message || 'Failed to scroll to highlight'
       });
     }
   }

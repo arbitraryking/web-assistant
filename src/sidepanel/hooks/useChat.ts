@@ -1,6 +1,6 @@
 // Hook for managing chat state and communication with background
 import { useState, useEffect, useCallback } from 'react';
-import { ChatMessage, MessageType } from '../../shared/types/messages';
+import { ChatMessage, MessageType, HighlightResult } from '../../shared/types/messages';
 
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -15,6 +15,7 @@ export function useChat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [streamingMessage, setStreamingMessage] = useState('');
+  const [highlights, setHighlights] = useState<HighlightResult[]>([]); // Track current highlights
 
   /**
    * Listen for streaming chunks from background
@@ -42,6 +43,12 @@ export function useChat() {
             setMessages((prev) => [...prev, assistantMessage]);
             setStreamingMessage('');
           }
+          break;
+
+        case MessageType.HIGHLIGHTS_READY:
+          // Store highlights for display
+          console.log('Highlights ready:', message.data.highlights);
+          setHighlights(message.data.highlights || []);
           break;
 
         case MessageType.ERROR:
@@ -115,6 +122,26 @@ export function useChat() {
     ]);
     setError(null);
     setStreamingMessage('');
+    setHighlights([]);
+  }, []);
+
+  /**
+   * Scroll to a specific highlight on the page
+   */
+  const scrollToHighlight = useCallback(async (highlightId: string) => {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: MessageType.SCROLL_TO_HIGHLIGHT,
+        data: { highlightId, animate: true },
+        timestamp: Date.now()
+      });
+
+      if (!response?.success) {
+        console.warn('Failed to scroll to highlight:', highlightId);
+      }
+    } catch (err) {
+      console.error('Error scrolling to highlight:', err);
+    }
   }, []);
 
   return {
@@ -124,7 +151,9 @@ export function useChat() {
     isStreaming,
     error,
     streamingMessage,
+    highlights,
     sendMessage,
-    clearChat
+    clearChat,
+    scrollToHighlight
   };
 }

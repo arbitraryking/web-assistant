@@ -4,6 +4,7 @@ import { HighlightInstruction } from '../shared/types/messages';
 class ContentHighlighter {
   private overlays: HTMLElement[] = [];
   private styleElement: HTMLStyleElement | null = null;
+  private highlightMap: Map<string, Element> = new Map(); // Map highlight ID to element
 
   constructor() {
     this.injectStyles();
@@ -60,8 +61,9 @@ class ContentHighlighter {
   /**
    * Highlight content based on instructions
    */
-  async highlight(instructions: HighlightInstruction[]): Promise<void> {
+  async highlight(instructions: HighlightInstruction[]): Promise<HighlightResult[]> {
     console.log('Highlighting content:', instructions);
+    const results: HighlightResult[] = [];
 
     // Clear existing highlights
     this.clearHighlights();
@@ -72,9 +74,19 @@ class ContentHighlighter {
         const elements = this.findElements(instruction);
 
         for (const element of elements) {
+          // Store element reference for later scrolling
+          this.highlightMap.set(instruction.id, element);
+
           // Create overlay
           const overlay = this.createOverlay(element, instruction);
           this.overlays.push(overlay);
+
+          // Track result for side panel
+          results.push({
+            id: instruction.id,
+            textSnippet: instruction.textSnippet,
+            element: this.getElementDescription(element)
+          });
 
           // Auto-scroll to first element if requested
           if (instruction.scrollTo && elements.indexOf(element) === 0) {
@@ -92,6 +104,31 @@ class ContentHighlighter {
         console.error('Error highlighting element:', error);
       }
     }
+
+    return results;
+  }
+
+  /**
+   * Scroll to a specific highlight by ID
+   */
+  async scrollToHighlight(highlightId: string, animate: boolean = true): Promise<boolean> {
+    const element = this.highlightMap.get(highlightId);
+    if (!element) {
+      console.warn(`Highlight not found: ${highlightId}`);
+      return false;
+    }
+
+    await this.smoothScrollTo(element, animate);
+    return true;
+  }
+
+  /**
+   * Get a human-readable description of an element
+   */
+  private getElementDescription(element: Element): string {
+    const tag = element.tagName.toLowerCase();
+    const text = element.textContent?.trim().substring(0, 50) || '';
+    return `${tag}: ${text}${text.length >= 50 ? '...' : ''}`;
   }
 
   /**
@@ -136,12 +173,24 @@ class ContentHighlighter {
   }
 
   /**
-   * Find element by text content
+   * Find element by text content with fuzzy matching
    */
   private findByText(text: string): Element | null {
     const normalizedText = text.trim().toLowerCase();
+    const searchTokens = this.tokenize(normalizedText);
 
-    // Create a TreeWalker to iterate through text nodes
+    // Try exact match first
+    const exactMatch = this.findByTextExact(normalizedText);
+    if (exactMatch) return exactMatch;
+
+    // Fall back to fuzzy matching
+    return this.findByTextFuzzy(searchTokens, normalizedText);
+  }
+
+  /**
+   * Find element by exact text match
+   */
+  private findByTextExact(normalizedText: string): Element | null {
     const walker = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_TEXT,
@@ -153,12 +202,74 @@ class ContentHighlighter {
       const content = node.textContent?.trim().toLowerCase() || '';
 
       if (content.includes(normalizedText)) {
-        // Return the parent element
         return node.parentElement;
       }
     }
 
     return null;
+  }
+
+  /**
+   * Find element by fuzzy text matching using Jaccard similarity
+   */
+  private findByTextFuzzy(searchTokens: string[], originalText: string): Element | null {
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+
+    let bestMatch: { element: Element | null; score: number } = {
+      element: null,
+      score: 0
+    };
+
+    const MIN_SCORE = 0.3; // Minimum similarity score to accept a match
+    let node;
+
+    while ((node = walker.nextNode())) {
+      const content = node.textContent?.trim().toLowerCase() || '';
+      if (content.length < 10) continue; // Skip very short text nodes
+
+      const contentTokens = this.tokenize(content);
+      const score = this.jaccardSimilarity(searchTokens, contentTokens);
+
+      if (score > bestMatch.score && score >= MIN_SCORE) {
+        bestMatch = {
+          element: node.parentElement,
+          score
+        };
+      }
+    }
+
+    console.log(`Fuzzy match for "${originalText.substring(0, 50)}..." - score: ${bestMatch.score.toFixed(2)}`);
+    return bestMatch.element;
+  }
+
+  /**
+   * Tokenize text into words (removes punctuation, splits on whitespace)
+   */
+  private tokenize(text: string): string[] {
+    return text
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(token => token.length > 0);
+  }
+
+  /**
+   * Calculate Jaccard similarity between two token sets
+   * J(A,B) = |A ∩ B| / |A ∪ B|
+   */
+  private jaccardSimilarity(tokens1: string[], tokens2: string[]): number {
+    const set1 = new Set(tokens1);
+    const set2 = new Set(tokens2);
+
+    const intersection = new Set([...set1].filter(x => set2.has(x)));
+    const union = new Set([...set1, ...set2]);
+
+    if (union.size === 0) return 0;
+    return intersection.size / union.size;
   }
 
   /**
@@ -245,6 +356,7 @@ class ContentHighlighter {
     });
 
     this.overlays = [];
+    this.highlightMap.clear();
   }
 
   /**
@@ -258,6 +370,13 @@ class ContentHighlighter {
       this.styleElement = null;
     }
   }
+}
+
+// Result interface for highlight operations
+export interface HighlightResult {
+  id: string;
+  textSnippet: string;
+  element: string; // Human-readable description
 }
 
 // Export singleton instance

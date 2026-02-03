@@ -14,6 +14,8 @@ export enum MessageType {
   // Highlighting
   HIGHLIGHT_CONTENT = 'HIGHLIGHT_CONTENT',
   CLEAR_HIGHLIGHTS = 'CLEAR_HIGHLIGHTS',
+  SCROLL_TO_HIGHLIGHT = 'SCROLL_TO_HIGHLIGHT',
+  HIGHLIGHTS_READY = 'HIGHLIGHTS_READY',
 
   // Settings
   GET_SETTINGS = 'GET_SETTINGS',
@@ -139,6 +141,27 @@ export interface HighlightContentRequest extends BaseMessage {
   data: {
     instructions: HighlightInstruction[];
   };
+}
+
+export interface ScrollToHighlightRequest extends BaseMessage {
+  type: MessageType.SCROLL_TO_HIGHLIGHT;
+  data: {
+    highlightId: string;
+    animate?: boolean;
+  };
+}
+
+export interface HighlightsReadyResponse extends BaseMessage {
+  type: MessageType.HIGHLIGHTS_READY;
+  data: {
+    highlights: HighlightResult[];
+  };
+}
+
+export interface HighlightResult {
+  id: string;
+  textSnippet: string;
+  element: string; // Human-readable description
 }
 
 export interface ErrorResponse extends BaseMessage {
