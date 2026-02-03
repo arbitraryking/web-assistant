@@ -25,10 +25,14 @@ function App() {
         </button>
       </nav>
 
-      {/* Main content */}
+      {/* Main content - both stay mounted to preserve state */}
       <main className="main-content">
-        {currentView === 'chat' && <Chat />}
-        {currentView === 'settings' && <Settings />}
+        <div className={`view-container ${currentView === 'chat' ? 'active' : ''}`}>
+          <Chat />
+        </div>
+        <div className={`view-container ${currentView === 'settings' ? 'active' : ''}`}>
+          <Settings />
+        </div>
       </main>
     </div>
   );
