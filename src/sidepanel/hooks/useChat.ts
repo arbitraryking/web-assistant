@@ -1,6 +1,6 @@
 // Hook for managing chat state and communication with background
 import { useState, useEffect, useCallback } from 'react';
-import { ChatMessage, MessageType, HighlightResult, SummarySection, Progress } from '../../shared/types/messages';
+import { ChatMessage, MessageType, HighlightResult, SummarySection, Progress, SelectedTextContext } from '../../shared/types/messages';
 
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -19,6 +19,7 @@ export function useChat() {
   const [summary, setSummary] = useState<{ overview: string; sections: SummarySection[]; pageTitle: string; pageUrl: string } | null>(null);
   const [summaryExpanded, setSummaryExpanded] = useState(true); // Summary panel collapse state
   const [summarizationProgress, setSummarizationProgress] = useState<Progress | null>(null); // Track summarization progress
+  const [selectedTexts, setSelectedTexts] = useState<SelectedTextContext[]>([]); // Track selected text contexts
 
   /**
    * Listen for streaming chunks from background
@@ -74,6 +75,19 @@ export function useChat() {
           }
           break;
 
+        case MessageType.ADD_SELECTED_TEXT:
+          // Add selected text as context for questioning
+          console.log('Selected text added:', message.data);
+          const { text, pageTitle, url } = message.data;
+          const newContext: SelectedTextContext = {
+            id: `context_${Date.now()}`,
+            text,
+            pageTitle,
+            url
+          };
+          setSelectedTexts((prev) => [...prev, newContext]);
+          break;
+
         case MessageType.ERROR:
           // Handle error
           setIsStreaming(false);
@@ -100,11 +114,20 @@ export function useChat() {
     setError(null);
     setStreamingMessage('');
 
+    // Prepare message content with selected text context if available
+    let messageContent = content.trim();
+    if (selectedTexts.length > 0) {
+      const contextBlocks = selectedTexts.map(
+        (ctx) => `[Context from ${ctx.pageTitle}:\n${ctx.text}]`
+      ).join('\n\n');
+      messageContent = `${contextBlocks}\n\nUser question: ${content}`;
+    }
+
     // Add user message to chat
     const userMessage: ChatMessage = {
       id: `user_${Date.now()}`,
       role: 'user',
-      content: content.trim(),
+      content: messageContent,
       timestamp: Date.now()
     };
 
@@ -130,7 +153,7 @@ export function useChat() {
       setError(err.message || 'Failed to send message');
       setIsStreaming(false);
     }
-  }, [messages, isStreaming]);
+  }, [messages, isStreaming, selectedTexts]);
 
   /**
    * Clear chat history
@@ -149,6 +172,7 @@ export function useChat() {
     setHighlights([]);
     setSummary(null);
     setSummarizationProgress(null);
+    setSelectedTexts([]);
   }, []);
 
   /**
@@ -174,6 +198,10 @@ export function useChat() {
     setSummaryExpanded(prev => !prev);
   }, []);
 
+  const removeSelectedText = useCallback((id: string) => {
+    setSelectedTexts((prev) => prev.filter(ctx => ctx.id !== id));
+  }, []);
+
   return {
     messages,
     input,
@@ -185,7 +213,9 @@ export function useChat() {
     summary,
     summaryExpanded,
     summarizationProgress,
+    selectedTexts,
     toggleSummary,
+    removeSelectedText,
     sendMessage,
     clearChat,
     scrollToHighlight

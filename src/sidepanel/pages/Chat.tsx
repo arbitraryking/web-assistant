@@ -14,7 +14,9 @@ function Chat() {
     summary,
     summaryExpanded,
     summarizationProgress,
+    selectedTexts,
     toggleSummary,
+    removeSelectedText,
     sendMessage,
     clearChat,
     scrollToHighlight
@@ -195,6 +197,35 @@ function Chat() {
           Summarize Page
         </button>
       </div>
+
+      {/* Selected text context cards */}
+      {selectedTexts.length > 0 && (
+        <div className="selected-texts-panel">
+          <div className="selected-texts-header">
+            <h4>Selected Text Context</h4>
+            <span className="selected-count">{selectedTexts.length}</span>
+          </div>
+          <div className="selected-text-cards">
+            {selectedTexts.map((ctx) => (
+              <div key={ctx.id} className="selected-text-card">
+                <div className="selected-text-header">
+                  <span className="selected-source">{ctx.pageTitle}</span>
+                  <button
+                    className="selected-remove"
+                    onClick={() => removeSelectedText(ctx.id)}
+                    title="Remove this context"
+                  >
+                    ×
+                  </button>
+                </div>
+                <p className="selected-text-content">
+                  {ctx.text.length > 150 ? ctx.text.substring(0, 150) + '...' : ctx.text}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="input-container">
         <textarea

@@ -53,6 +53,57 @@ class ContentHighlighter {
           opacity: 0.8;
         }
       }
+
+      /* Floating "Ask about this" button for text selection */
+      .llm-assistant-ask-button {
+        position: absolute;
+        z-index: 999998;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 24px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        user-select: none;
+        animation: llm-ask-button-fade-in 0.2s ease;
+      }
+
+      .llm-assistant-ask-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+      }
+
+      .llm-assistant-ask-button:active {
+        transform: translateY(0);
+      }
+
+      .ask-button-icon {
+        font-size: 16px;
+        line-height: 1;
+      }
+
+      .ask-button-text {
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      @keyframes llm-ask-button-fade-in {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
     `;
 
     document.head.appendChild(this.styleElement);

@@ -5,6 +5,7 @@ export enum MessageType {
   CHAT_MESSAGE = 'CHAT_MESSAGE',
   STREAM_CHUNK = 'STREAM_CHUNK',
   STREAM_COMPLETE = 'STREAM_COMPLETE',
+  ADD_SELECTED_TEXT = 'ADD_SELECTED_TEXT',
 
   // Page summarization
   SUMMARIZE_PAGE = 'SUMMARIZE_PAGE',
@@ -125,6 +126,22 @@ export interface StreamChunkResponse extends BaseMessage {
     chunk: string;
     messageId: string;
   };
+}
+
+export interface AddSelectedTextRequest extends BaseMessage {
+  type: MessageType.ADD_SELECTED_TEXT;
+  data: {
+    text: string;
+    url: string;
+    pageTitle: string;
+  };
+}
+
+export interface SelectedTextContext {
+  id: string;
+  text: string;
+  url: string;
+  pageTitle: string;
 }
 
 export interface SummarizePageRequest extends BaseMessage {
