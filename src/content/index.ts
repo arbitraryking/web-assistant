@@ -3,7 +3,7 @@ import { MessageType, HighlightInstruction } from '../shared/types/messages';
 import { extractPageContent, extractHeadingsStructure } from './contentExtractor';
 import { highlighter } from './highlighter';
 
-console.log('LLM Assistant: Content script loaded on', window.location.href);
+console.log('PagePilot: Content script loaded on', window.location.href);
 
 // Message listener
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

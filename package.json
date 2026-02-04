@@ -1,7 +1,7 @@
 {
-  "name": "llm-chrome-extension",
+  "name": "pagepilot-extension",
   "version": "1.0.0",
-  "description": "LLM-driven Chrome extension with chat and page summarization",
+  "description": "Your AI copilot for the web - chat, summarize, and explore any page",
   "type": "module",
   "scripts": {
     "dev": "vite",

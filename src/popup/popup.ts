@@ -1,4 +1,4 @@
-// Popup script for LLM Assistant
+// Popup script for PagePilot
 // This popup acts as an intermediate step to preserve user gesture context
 
 document.addEventListener('DOMContentLoaded', async () => {

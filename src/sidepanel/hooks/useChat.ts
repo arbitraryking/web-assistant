@@ -7,7 +7,7 @@ export function useChat() {
     {
       id: 'welcome',
       role: 'assistant',
-      content: 'Hello! I\'m your AI assistant. How can I help you today?',
+      content: 'Hi! I\'m PagePilot, your AI copilot for the web. How can I help you today?',
       timestamp: Date.now()
     }
   ]);
@@ -209,7 +209,7 @@ export function useChat() {
       {
         id: 'welcome',
         role: 'assistant',
-        content: 'Hello! I\'m your AI assistant. How can I help you today?',
+        content: 'Hi! I\'m PagePilot, your AI copilot for the web. How can I help you today?',
         timestamp: Date.now()
       }
     ]);

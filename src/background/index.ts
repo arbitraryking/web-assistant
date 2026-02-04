@@ -6,7 +6,7 @@ import { openaiProvider } from './openaiProvider';
 import { anthropicProvider } from './anthropicProvider';
 import { customProvider } from './customProvider';
 
-console.log('LLM Assistant: Background service worker loaded');
+console.log('PagePilot: Background service worker loaded');
 
 // Register LLM providers
 llmService.registerProvider(openaiProvider);
@@ -15,7 +15,7 @@ llmService.registerProvider(customProvider);
 
 // Set up side panel on extension install
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('LLM Assistant: Extension installed');
+  console.log('PagePilot: Extension installed');
 
   // Register context menu for text selection
   chrome.contextMenus.create({

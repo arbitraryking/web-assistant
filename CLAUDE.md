@@ -43,6 +43,7 @@ The central hub. `index.ts` registers providers and sets up the single `chrome.r
 Injected into every page. Listens for messages from the background:
 - `GET_PAGE_CONTENT` — Extracts page text via `@mozilla/readability` (`contentExtractor.ts`), with fallback selectors if Readability fails.
 - `HIGHLIGHT_CONTENT` — Creates absolutely-positioned overlay `div`s over target elements found by text snippet (via TreeWalker), CSS selector, or XPath (`highlighter.ts`). Overlays update position on scroll/resize and auto-remove after a configurable duration.
+- **Text Selection Feature** — `TextSelectionHandler` class in `index.ts` provides floating "Ask AI" button when user selects text (300ms debounce). Detects if side panel is open/closed via message response timing. If closed, stores text in session storage and shows notification.
 - If the content script isn't loaded when the background needs it, `messageHandler.ensureContentScriptLoaded()` injects it via `chrome.scripting.executeScript`.
 
 ### Shared (`src/shared/`)
@@ -55,6 +56,20 @@ Injected into every page. Listens for messages from the background:
 **Chat:** Side panel sends `CHAT_MESSAGE` with the full message history. Background streams `STREAM_CHUNK` messages back (one per SSE delta) until it sends `STREAM_COMPLETE`. The `useChat` hook accumulates chunks into `streamingMessage` state and finalizes into a message on completion.
 
 **Summarization:** Side panel sends `SUMMARIZE_PAGE`. Background pings the content script (injecting it if needed), sends `GET_PAGE_CONTENT`, gets the extracted text back, streams the LLM summary the same way as chat, then parses highlights out of the completed response and sends `HIGHLIGHT_CONTENT` to the content script. Highlight parsing tries JSON first (matching the structured format in `DEFAULT_SETTINGS.customPrompts.summarize`), then falls back to regex-matching quoted strings against the page content.
+
+**Text Selection (Floating Button):**
+1. Content script's `TextSelectionHandler` detects text selection, shows floating button (debounced 300ms)
+2. User clicks button → content script sends `ADD_SELECTED_TEXT` message
+3. **If side panel open**: Side panel's listener responds `{success: true}` and adds text to `selectedTexts` state immediately
+4. **If side panel closed**: No response (message times out immediately since background returns `false` for this type), content script sends `STORE_SELECTED_TEXT` to background, which stores in `chrome.storage.session` and shows notification
+5. When user opens side panel, `useChat` polls storage and loads pending text
+
+**Text Selection (Context Menu):**
+1. User right-clicks selected text → "Ask AI about this"
+2. Background's `contextMenus.onClicked` handler receives event (legitimate user gesture)
+3. Stores text in `chrome.storage.session` with `pendingTextTransfer: true`
+4. Opens side panel via `chrome.sidePanel.open()` (works because of user gesture)
+5. Side panel polls storage and loads text on mount
 
 **Settings:** Simple request/response — `GET_SETTINGS` / `SAVE_SETTINGS` — no streaming involved.
 

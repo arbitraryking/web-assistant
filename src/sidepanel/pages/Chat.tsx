@@ -62,8 +62,8 @@ function Chat() {
     <div className="chat-container">
       <div className="chat-header">
         <div>
-          <h1>LLM Assistant</h1>
-          <p>Chat with AI or summarize the current page</p>
+          <h1>PagePilot</h1>
+          <p>Your AI copilot for the web</p>
         </div>
         <button className="clear-button" onClick={clearChat} title="Clear chat">
           Clear

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "LLM Assistant",
+  "name": "PagePilot",
   "version": "1.0.0",
-  "description": "AI-powered web assistant with chat and page summarization",
+  "description": "Your AI copilot for the web - chat, summarize, and explore any page",
 
   "permissions": [
     "sidePanel",
@@ -34,7 +34,7 @@
   },
 
   "action": {
-    "default_title": "Open LLM Assistant",
+    "default_title": "Open PagePilot",
     "default_popup": "src/popup/popup.html"
   },
 
