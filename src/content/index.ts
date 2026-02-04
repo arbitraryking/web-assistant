@@ -179,6 +179,7 @@ injectFloatingButtonStyles();
 class TextSelectionHandler {
   private floatingButton: HTMLElement | null = null;
   private hideTimeout: number | null = null;
+  private debounceTimeout: number | null = null;
 
   constructor() {
     this.init();
@@ -194,14 +195,23 @@ class TextSelectionHandler {
   }
 
   private handleMouseUp() {
-    // Small delay to let selection complete
-    setTimeout(() => {
+    // Debounce to prevent flickering during selection
+    if (this.debounceTimeout) {
+      clearTimeout(this.debounceTimeout);
+    }
+    this.debounceTimeout = window.setTimeout(() => {
       this.showFloatingButtonIfNeeded();
-    }, 100);
+    }, 300);
   }
 
   private handleSelectionChange() {
-    this.showFloatingButtonIfNeeded();
+    // Debounce selectionchange events
+    if (this.debounceTimeout) {
+      clearTimeout(this.debounceTimeout);
+    }
+    this.debounceTimeout = window.setTimeout(() => {
+      this.showFloatingButtonIfNeeded();
+    }, 300);
   }
 
   private handleMouseDown(e: MouseEvent) {
@@ -262,11 +272,22 @@ class TextSelectionHandler {
       button.style.left = `${rect.left + window.scrollX + (rect.width / 2) - 80}px`;
     }
 
-    // Click handler
-    button.addEventListener('click', (e) => {
+    // Click handler - try to send directly, or store for later
+    button.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      this.sendSelectedTextToChat(selectedText);
+
+      // Try to send selected text to chat (works if side panel is open)
+      const response = await this.sendSelectedTextToChat(selectedText);
+
+      if (!response || !response.success) {
+        // Side panel is not open, ask background to store the text
+        await this.storeSelectedTextForLater(selectedText);
+
+        // Show notification to guide user
+        this.showOpenExtensionNotification();
+      }
+
       this.hideFloatingButton();
     });
 
@@ -291,18 +312,150 @@ class TextSelectionHandler {
       clearTimeout(this.hideTimeout);
       this.hideTimeout = null;
     }
+    if (this.debounceTimeout) {
+      clearTimeout(this.debounceTimeout);
+      this.debounceTimeout = null;
+    }
   }
 
-  private sendSelectedTextToChat(text: string) {
-    chrome.runtime.sendMessage({
-      type: MessageType.ADD_SELECTED_TEXT,
-      data: {
-        text,
-        url: window.location.href,
-        pageTitle: document.title
-      },
-      timestamp: Date.now()
+  private sendSelectedTextToChat(text: string): Promise<any> {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: MessageType.ADD_SELECTED_TEXT,
+          data: {
+            text,
+            url: window.location.href,
+            pageTitle: document.title
+          },
+          timestamp: Date.now()
+        },
+        (response) => {
+          resolve(response);
+        }
+      );
     });
+  }
+
+  private storeSelectedTextForLater(text: string): Promise<void> {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: MessageType.STORE_SELECTED_TEXT,
+          data: {
+            text,
+            url: window.location.href,
+            pageTitle: document.title
+          },
+          timestamp: Date.now()
+        },
+        () => {
+          resolve();
+        }
+      );
+    });
+  }
+
+  private showOpenExtensionNotification() {
+    // Create a notification element
+    const notification = document.createElement('div');
+    notification.className = 'llm-assistant-notification';
+    notification.innerHTML = `
+      <div class="notification-content">
+        <span class="notification-icon">💡</span>
+        <span class="notification-text">Click the extension icon in the toolbar to open the panel</span>
+        <button class="notification-close">×</button>
+      </div>
+    `;
+
+    // Position the notification
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.right = '20px';
+    notification.style.zIndex = '999999';
+
+    // Add styles
+    const style = document.createElement('style');
+    style.textContent = `
+      .llm-assistant-notification {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        animation: slideIn 0.3s ease, fadeOut 0.3s ease 4.7s forwards;
+        max-width: 350px;
+      }
+
+      .notification-content {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .notification-icon {
+        font-size: 20px;
+        flex-shrink: 0;
+      }
+
+      .notification-text {
+        flex: 1;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+
+      .notification-close {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 1;
+        flex-shrink: 0;
+        transition: background 0.2s;
+      }
+
+      .notification-close:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateX(400px);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      @keyframes fadeOut {
+        to {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+    document.body.appendChild(notification);
+
+    // Close button handler
+    const closeBtn = notification.querySelector('.notification-close');
+    closeBtn?.addEventListener('click', () => {
+      notification.remove();
+    });
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      if (notification.parentElement) {
+        notification.remove();
+      }
+    }, 5000);
   }
 }
 

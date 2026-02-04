@@ -8,7 +8,8 @@
     "sidePanel",
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "contextMenus"
   ],
 
   "host_permissions": [
@@ -33,7 +34,8 @@
   },
 
   "action": {
-    "default_title": "Open LLM Assistant"
+    "default_title": "Open LLM Assistant",
+    "default_popup": "src/popup/popup.html"
   },
 
   "content_security_policy": {

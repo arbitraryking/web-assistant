@@ -22,10 +22,51 @@ export function useChat() {
   const [selectedTexts, setSelectedTexts] = useState<SelectedTextContext[]>([]); // Track selected text contexts
 
   /**
+   * Check for selected text from session storage on mount
+   * Poll multiple times to handle race condition with popup
+   */
+  useEffect(() => {
+    let pollCount = 0;
+    const maxPolls = 10; // Poll for up to 5 seconds (10 * 500ms)
+
+    const checkForSelectedText = () => {
+      chrome.storage.session.get(
+        ['selectedText', 'selectedTextUrl', 'selectedTextTitle', 'pendingTextTransfer'],
+        (result) => {
+          if (result.selectedText && result.pendingTextTransfer) {
+            const { selectedText, selectedTextUrl, selectedTextTitle } = result;
+            const newContext: SelectedTextContext = {
+              id: `context_${Date.now()}`,
+              text: selectedText,
+              pageTitle: selectedTextTitle || 'Unknown Page',
+              url: selectedTextUrl || ''
+            };
+            setSelectedTexts((prev) => [...prev, newContext]);
+
+            // Clear from storage so it doesn't persist
+            chrome.storage.session.remove([
+              'selectedText',
+              'selectedTextUrl',
+              'selectedTextTitle',
+              'pendingTextTransfer'
+            ]);
+          } else if (pollCount < maxPolls) {
+            // Poll again after a delay
+            pollCount++;
+            setTimeout(checkForSelectedText, 500);
+          }
+        }
+      );
+    };
+
+    checkForSelectedText();
+  }, []);
+
+  /**
    * Listen for streaming chunks from background
    */
   useEffect(() => {
-    const handleMessage = (message: any) => {
+    const handleMessage = (message: any, _sender: any, sendResponse: (response?: any) => void) => {
       console.log('Chat received message:', message);
 
       switch (message.type) {
@@ -76,6 +117,7 @@ export function useChat() {
           break;
 
         case MessageType.ADD_SELECTED_TEXT:
+        case MessageType.SELECTED_TEXT_FROM_MENU:
           // Add selected text as context for questioning
           console.log('Selected text added:', message.data);
           const { text, pageTitle, url } = message.data;
@@ -86,6 +128,10 @@ export function useChat() {
             url
           };
           setSelectedTexts((prev) => [...prev, newContext]);
+          // Send success response for ADD_SELECTED_TEXT
+          if (message.type === MessageType.ADD_SELECTED_TEXT) {
+            sendResponse({ success: true });
+          }
           break;
 
         case MessageType.ERROR:

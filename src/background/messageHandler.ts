@@ -106,7 +106,31 @@ export class MessageHandler {
           sendResponse({ success: true });
           return false;
 
+        case MessageType.STORE_SELECTED_TEXT:
+          this.handleStoreSelectedText(message, sendResponse).catch((err) => {
+            console.error('Error in handleStoreSelectedText:', err);
+            sendResponse({
+              success: false,
+              error: err.message || 'Failed to store selected text'
+            });
+          });
+          return false;
+
+        case MessageType.SELECTED_TEXT_FROM_MENU:
+          // From context menu - already handled by index.ts (storage + message sent)
+          // Just acknowledge
+          sendResponse({ success: true });
+          return false;
+
         default:
+          // ADD_SELECTED_TEXT is handled by side panel, not background
+          // Don't respond so side panel can respond
+          if (message.type === MessageType.ADD_SELECTED_TEXT) {
+            console.log('ADD_SELECTED_TEXT passed to side panel');
+            return false; // Keep channel open for side panel to respond
+          }
+
+          // Truly unknown messages
           console.warn('Unknown message type:', message.type);
           sendResponse({
             success: false,
@@ -680,6 +704,35 @@ Keep the summary concise and focused on the most important information.`;
       sendResponse({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to save settings'
+      });
+    }
+  }
+
+  /**
+   * Handle store selected text requests (from content script)
+   * Background script stores in session storage since content scripts can't
+   */
+  private async handleStoreSelectedText(
+    message: any,
+    sendResponse: SendResponse
+  ): Promise<void> {
+    try {
+      const { text, url, pageTitle } = message.data;
+
+      // Store in session storage
+      await chrome.storage.session.set({
+        selectedText: text,
+        selectedTextUrl: url,
+        selectedTextTitle: pageTitle
+      });
+
+      console.log('Stored selected text for later:', text.substring(0, 50) + '...');
+      sendResponse({ success: true });
+    } catch (error: any) {
+      console.error('Error storing selected text:', error);
+      sendResponse({
+        success: false,
+        error: error.message || 'Failed to store selected text'
       });
     }
   }
