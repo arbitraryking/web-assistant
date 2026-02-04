@@ -1,5 +1,22 @@
 # PagePilot
 
+<div align="center">
+
+![logo](./public/icons/logo-banner.png)
+
+</div>
+
+<div align="center">
+
+![visitors](https://visitor-badge.laobi.icu/badge?page_id=arbitraryking.pagepilot-extension)
+[![GitHub Repo stars](https://img.shields.io/github/stars/arbitraryking/pagepilot-extension?style=social)](https://github.com/arbitraryking/pagepilot-extension/stargazers)
+[![GitHub Code License](https://img.shields.io/github/license/arbitraryking/pagepilot-extension)](LICENSE)
+[![GitHub last commit](https://img.shields.io/github/last-commit/arbitraryking/pagepilot-extension)](https://github.com/arbitraryking/pagepilot-extension/commits/master)
+[![GitHub pull request](https://img.shields.io/badge/PRs-welcome-blue)](https://github.com/arbitraryking/pagepilot-extension/pulls)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome-Web%20Store-green)](https://chrome.google.com/webstore/detail/YOUR_EXTENSION_ID)
+
+</div>
+
 An AI-powered Chrome extension that brings ChatGPT/Claude-like capabilities to your browsing experience. Chat with AI, summarize web pages with auto-highlighting, and ask questions about selected text - all without leaving your current page.
 
 ## ✨ Features
